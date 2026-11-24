@@ -25,6 +25,8 @@ import { ProgressUploadPage } from './pages/admin/ProgressUploadPage'
 import { PublicChatsPage } from './pages/admin/PublicChatsPage'
 import { SiteContentPage } from './pages/admin/SiteContentPage'
 import { ShowcaseProjectsPage } from './pages/admin/ShowcaseProjectsPage'
+import { AdminSocialsPage } from './pages/admin/AdminSocialsPage'
+import { NewEnquiryPage } from './pages/portal/NewEnquiryPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -110,6 +112,7 @@ export default function App() {
             }
           >
             <Route index element={<DashboardPage />} />
+            <Route path="enquiry" element={<NewEnquiryPage />} />
             <Route path="projects/:id" element={<ProjectDetailPage />} />
             <Route path="projects/:id/boq" element={<BoqPage />} />
           </Route>
@@ -132,6 +135,7 @@ export default function App() {
             <Route path="projects/:id/progress" element={<ProgressUploadPage />} />
             <Route path="chats" element={<PublicChatsPage />} />
             <Route path="content" element={<SiteContentPage />} />
+            <Route path="socials" element={<AdminSocialsPage />} />
             <Route path="showcase" element={<ShowcaseProjectsPage />} />
           </Route>
 

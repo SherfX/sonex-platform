@@ -6,7 +6,8 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { AppCard } from '../../components/ui/AppCard'
 import { PageLoader } from '../../components/ui/PageLoader'
-import { inputClassName } from '../../components/ui/inputStyles'
+import { buttonPrimaryClassName, inputClassName } from '../../components/ui/inputStyles'
+import { markBoqSharedForProject } from '../../lib/enquiries'
 
 type Item = {
   id: string
@@ -29,6 +30,7 @@ export function AdminBoqPage() {
   const [boq, setBoq] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -74,12 +76,73 @@ export function AdminBoqPage() {
     setSaving(false)
   }
 
+  async function createBoq() {
+    if (!id) return
+    setSaving(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const { data: project } = await supabase.from('projects').select('title').eq('id', id).single()
+    const { data: doc, error } = await supabase
+      .from('boq_documents')
+      .insert({
+        project_id: id,
+        title: project?.title ? `BOQ — ${project.title}` : 'Bill of quantities',
+        status: 'draft',
+        is_client_visible: false,
+        created_by: user?.id,
+      })
+      .select('id')
+      .single()
+    if (!error && doc) {
+      const { data: section } = await supabase
+        .from('boq_sections')
+        .insert({ boq_document_id: doc.id, title: 'Section 1', sort_order: 1 })
+        .select('id')
+        .single()
+      if (section) {
+        await supabase.from('boq_items').insert({
+          section_id: section.id,
+          description: 'Add line item description',
+          unit: 'Item',
+          quantity: 1,
+          rate: 0,
+          sort_order: 1,
+        })
+      }
+    }
+    await loadBoq()
+    setSaving(false)
+  }
+
+  async function toggleClientVisibility() {
+    if (!boq || !id) return
+    setSharing(true)
+    const next = !boq.is_client_visible
+    await supabase
+      .from('boq_documents')
+      .update({
+        is_client_visible: next,
+        status: next ? 'approved' : 'draft',
+      })
+      .eq('id', boq.id)
+    if (next) await markBoqSharedForProject(id)
+    await loadBoq()
+    setSharing(false)
+  }
+
   if (loading) return <PageLoader label="Loading BOQ editor…" />
   if (!boq) {
     return (
       <AppCard>
-        <p>No BOQ found for this project.</p>
-        <Link to="/admin/projects" className="mt-2 inline-block text-sm text-primary hover:underline">
+        <p className="font-medium">No BOQ for this project yet</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Create a bill of quantities, edit it here, then share with the client when ready.
+        </p>
+        <button type="button" onClick={createBoq} disabled={saving} className={`mt-4 ${buttonPrimaryClassName}`}>
+          {saving ? 'Creating…' : 'Create BOQ'}
+        </button>
+        <Link to="/admin/projects" className="mt-4 inline-block text-sm text-primary hover:underline">
           Back to projects
         </Link>
       </AppCard>
@@ -105,8 +168,35 @@ export function AdminBoqPage() {
         eyebrow="BOQ editor"
         title={boq.title}
         description={`${boq.currency} · ${saving ? 'Saving changes…' : 'Edit quantities and rates inline'}`}
-        actions={<StatusBadge status={boq.status} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={boq.status} />
+            <button
+              type="button"
+              disabled={sharing}
+              onClick={toggleClientVisibility}
+              className={
+                boq.is_client_visible
+                  ? 'rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted'
+                  : buttonPrimaryClassName
+              }
+            >
+              {sharing
+                ? 'Updating…'
+                : boq.is_client_visible
+                  ? 'Visible to client — click to hide'
+                  : 'Share BOQ with client'}
+            </button>
+          </div>
+        }
       />
+
+      {boq.is_client_visible && (
+        <p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-200">
+          Clients with access to this project can view the BOQ and request a download. Linked enquiry status is set to
+          BOQ shared.
+        </p>
+      )}
 
       <div className="space-y-6">
         {sections.map((section) => {

@@ -28,6 +28,33 @@ export async function resolvePublicMediaUrl(mediaAssetId: string | null | undefi
   return getStoragePublicUrl(asset.bucket, asset.path)
 }
 
+export async function resolveBackgroundUrlsBySlot(): Promise<
+  Record<BackgroundSlotKey, string | null>
+> {
+  const out = {
+    hero_background: null,
+    cta_background: null,
+    services_background: null,
+  } as Record<BackgroundSlotKey, string | null>
+
+  for (const slot of BACKGROUND_SLOTS) {
+    const { data: row } = await supabase
+      .from('site_content')
+      .select('body')
+      .eq('content_key', slot.key)
+      .maybeSingle()
+
+    let mediaId: string | null = null
+    if (row?.body && typeof row.body === 'object' && row.body !== null && !Array.isArray(row.body)) {
+      const id = (row.body as { media_asset_id?: string | null }).media_asset_id
+      mediaId = id ?? null
+    }
+    out[slot.key] = await resolvePublicMediaUrl(mediaId)
+  }
+
+  return out
+}
+
 export async function fetchPublicMediaLibrary(): Promise<MediaAsset[]> {
   const { data } = await supabase
     .from('media_assets')
@@ -80,26 +107,41 @@ export const BACKGROUND_SLOTS: { key: BackgroundSlotKey; label: string; descript
   { key: 'services_background', label: 'Services', description: 'Optional backdrop for the services grid.' },
 ]
 
+/** Assign one image to exactly one slot — never shares with other slots. */
 export async function assignBackgroundImage(slotKey: BackgroundSlotKey, mediaAssetId: string | null) {
+  const slotMeta = BACKGROUND_SLOTS.find((s) => s.key === slotKey)
+  const body = {
+    media_asset_id: mediaAssetId,
+    label: slotMeta?.label ?? slotKey,
+  }
+
   const { data: existing } = await supabase
     .from('site_content')
-    .select('id, body')
+    .select('id')
     .eq('content_key', slotKey)
     .maybeSingle()
 
-  const body = {
-    ...(typeof existing?.body === 'object' && existing.body !== null ? existing.body : {}),
-    media_asset_id: mediaAssetId,
-  }
-
   if (existing?.id) {
-    await supabase.from('site_content').update({ body }).eq('id', existing.id)
+    await supabase
+      .from('site_content')
+      .update({ title: slotMeta?.label, body })
+      .eq('content_key', slotKey)
   } else {
     await supabase.from('site_content').insert({
       content_key: slotKey,
-      title: slotKey,
+      title: slotMeta?.label,
       body,
       is_published: true,
     })
   }
+}
+
+export async function uploadAndAssignBackground(
+  slotKey: BackgroundSlotKey,
+  file: File,
+): Promise<MediaAsset | null> {
+  const asset = await uploadPublicSiteImage(file, `${slotKey} background`)
+  if (!asset) return null
+  await assignBackgroundImage(slotKey, asset.id)
+  return asset
 }

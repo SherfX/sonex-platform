@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
-import { ArrowRight, MapPin } from 'lucide-react'
+import { Link, useLocation } from 'react-router'
+import { ArrowRight, MapPin, Upload } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { DashboardSkeleton } from '../../components/ui/Skeleton'
 import { AppCard } from '../../components/ui/AppCard'
+import { buttonAccentClassName } from '../../components/ui/inputStyles'
 import { formatRelative } from '../../lib/format'
 
 type Project = {
@@ -19,20 +20,27 @@ type Project = {
 }
 
 export function DashboardPage() {
+  const location = useLocation()
   const [projects, setProjects] = useState<Project[]>([])
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
+  const enquirySent = Boolean((location.state as { enquirySent?: boolean } | null)?.enquirySent)
 
   useEffect(() => {
     async function load() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
-      setName(user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there')
+      if (!user) {
+        setLoading(false)
+        return
+      }
+      setName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'there')
 
       const { data } = await supabase
         .from('projects')
         .select('id, title, status, completion_percentage, location, updated_at')
+        .eq('client_id', user.id)
         .order('updated_at', { ascending: false })
 
       setProjects(data || [])
@@ -51,7 +59,19 @@ export function DashboardPage() {
         eyebrow="Client portal"
         title={`Welcome back, ${name}`}
         description="Track progress, view BOQs, message your project team, and upload project files."
+        actions={
+          <Link to="/portal/enquiry" className={buttonAccentClassName}>
+            <Upload className="mr-2 h-4 w-4" />
+            Start new enquiry / Upload plans
+          </Link>
+        }
       />
+
+      {enquirySent && (
+        <p className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+          Your enquiry was submitted. Our team will review your plans and create your project here in the portal.
+        </p>
+      )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
         <AppCard className="bg-gradient-to-br from-primary/10 to-card">
@@ -63,9 +83,9 @@ export function DashboardPage() {
           <p className="mt-2 text-3xl font-bold">{activeCount}</p>
         </AppCard>
         <AppCard>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Need help?</p>
-          <Link to="/contact" className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
-            Contact Sonex →
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">New build?</p>
+          <Link to="/portal/enquiry" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline">
+            Upload plans & enquire →
           </Link>
         </AppCard>
       </div>
@@ -73,10 +93,10 @@ export function DashboardPage() {
       {projects.length === 0 ? (
         <EmptyState
           title="No projects yet"
-          description="When Sonex onboards your build, it will show up here with progress, BOQs, and team messages."
+          description="Submit an enquiry with your drawings and our team will set up your project. Once created, progress, BOQs, and messages appear here."
           action={
-            <Link to="/contact" className="text-sm font-semibold text-primary hover:underline">
-              Start a project enquiry
+            <Link to="/portal/enquiry" className={buttonAccentClassName}>
+              Start new enquiry / Upload plans
             </Link>
           }
         />

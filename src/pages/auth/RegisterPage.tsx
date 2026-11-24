@@ -22,7 +22,10 @@ export function RegisterPage() {
 
     setLoading(false)
     if (error) setMessage(error.message)
-    else setMessage('Check your email to confirm your account.')
+    else
+      setMessage(
+        'Account created successfully. You can now sign in.',
+      )
   }
 
   return (
@@ -60,7 +63,21 @@ export function RegisterPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-md border px-3 py-2"
           />
-          {message && <p className="text-sm">{message}</p>}
+          {message && (
+            <p
+              className={`text-sm ${message.includes('successfully') ? 'text-emerald-700 dark:text-emerald-300' : 'text-destructive'}`}
+            >
+              {message}
+              {message.includes('successfully') && (
+                <>
+                  {' '}
+                  <Link to="/login" className="font-semibold text-primary hover:underline">
+                    Sign in
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
           <button
             type="submit"
             disabled={loading}

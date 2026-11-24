@@ -7,19 +7,42 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { ListSkeleton } from '../../components/ui/Skeleton'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 
+type ProjectRow = {
+  id: string
+  title: string
+  status: string
+  location: string | null
+  completion_percentage: number
+  enquiryStatus?: string | null
+}
+
 export function AdminProjectsPage() {
-  const [projects, setProjects] = useState<any[]>([])
+  const [projects, setProjects] = useState<ProjectRow[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase
-      .from('projects')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setProjects(data || [])
-        setLoading(false)
-      })
+    async function load() {
+      const [{ data: projectRows }, { data: submissions }] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('id, title, status, location, completion_percentage')
+          .order('created_at', { ascending: false }),
+        supabase.from('project_submissions').select('project_id, status').not('project_id', 'is', null),
+      ])
+
+      const enquiryByProject = new Map(
+        (submissions || []).map((s) => [s.project_id as string, s.status as string]),
+      )
+
+      setProjects(
+        (projectRows || []).map((p) => ({
+          ...p,
+          enquiryStatus: enquiryByProject.get(p.id) ?? null,
+        })),
+      )
+      setLoading(false)
+    }
+    load()
   }, [])
 
   return (
@@ -27,13 +50,21 @@ export function AdminProjectsPage() {
       <PageHeader
         eyebrow="Delivery"
         title="Projects"
-        description="Manage BOQs, progress updates, and client conversations."
+        description="Create or edit BOQs, share with clients, and track site progress."
       />
 
       {loading ? (
         <ListSkeleton rows={4} />
       ) : projects.length === 0 ? (
-        <EmptyState title="No projects" description="Create projects in Supabase or seed data to get started." />
+        <EmptyState
+          title="No projects"
+          description="Convert an enquiry from the Enquiries inbox to create a client-linked project."
+          action={
+            <Link to="/admin/enquiries" className="text-sm font-semibold text-primary hover:underline">
+              Go to enquiries →
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {projects.map((p) => (
@@ -43,6 +74,7 @@ export function AdminProjectsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-semibold">{p.title}</h2>
                     <StatusBadge status={p.status} />
+                    {p.enquiryStatus && <StatusBadge status={p.enquiryStatus} className="opacity-90" />}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {p.location || 'No location'} · {p.completion_percentage}% complete

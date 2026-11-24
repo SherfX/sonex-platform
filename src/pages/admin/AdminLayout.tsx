@@ -9,6 +9,7 @@ const links = [
   { to: '/admin/download-requests', label: 'Downloads' },
   { to: '/admin/chats', label: 'Chats' },
   { to: '/admin/content', label: 'Content' },
+  { to: '/admin/socials', label: 'Socials' },
   { to: '/admin/showcase', label: 'Showcase' },
 ]
 
