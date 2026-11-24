@@ -4,21 +4,39 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { AppCard } from '../../components/ui/AppCard'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { MessageThread, type ThreadMessage } from '../../components/messaging/MessageThread'
+import { useConversationMessages } from '../../hooks/useConversationMessages'
 import { formatRelative } from '../../lib/format'
 import { cn } from '../../lib/utils'
 
 export function PublicChatsPage() {
   const [conversations, setConversations] = useState<any[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selected, setSelected] = useState<any>(null)
-  const [messages, setMessages] = useState<ThreadMessage[]>([])
   const [userId, setUserId] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   const [loadingList, setLoadingList] = useState(true)
+
+  const { messages, appendUnique } = useConversationMessages(selectedId)
 
   useEffect(() => {
     loadConversations()
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null))
   }, [])
+
+  useEffect(() => {
+    if (!selectedId) return
+    const channel = supabase
+      .channel('public-conversations-list')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'conversations', filter: 'project_id=is.null' },
+        () => loadConversations(),
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedId])
 
   async function loadConversations() {
     setLoadingList(true)
@@ -31,30 +49,20 @@ export function PublicChatsPage() {
     setLoadingList(false)
   }
 
-  async function openConversation(conv: any) {
+  function openConversation(conv: any) {
     setSelected(conv)
-    const { data } = await supabase
-      .from('messages')
-      .select('id, body, sender_id, created_at, profiles(full_name, email)')
-      .eq('conversation_id', conv.id)
-      .order('created_at', { ascending: true })
-    setMessages((data as ThreadMessage[]) || [])
+    setSelectedId(conv.id)
   }
 
   async function sendReply(body: string) {
-    if (!selected || !userId) return
+    if (!selectedId || !userId) return
     setSending(true)
-    await supabase.from('messages').insert({
-      conversation_id: selected.id,
-      sender_id: userId,
-      body,
-    })
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('messages')
+      .insert({ conversation_id: selectedId, sender_id: userId, body })
       .select('id, body, sender_id, created_at, profiles(full_name, email)')
-      .eq('conversation_id', selected.id)
-      .order('created_at', { ascending: true })
-    setMessages((data as ThreadMessage[]) || [])
+      .single()
+    if (!error && data) appendUnique(data as ThreadMessage)
     setSending(false)
   }
 
@@ -63,11 +71,11 @@ export function PublicChatsPage() {
       <PageHeader
         eyebrow="Support"
         title="Public chats"
-        description="Visitor conversations from the website chat widget."
+        description="Visitor conversations from the website chat widget — updates live."
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,18rem)_1fr]">
-        <AppCard className="p-3 lg:max-h-[32rem] lg:overflow-y-auto">
+        <AppCard className="p-3 shadow-md lg:max-h-[32rem] lg:overflow-y-auto">
           <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Conversations
           </p>
@@ -102,7 +110,7 @@ export function PublicChatsPage() {
 
         <div>
           {!selected ? (
-            <AppCard className="flex min-h-[24rem] items-center justify-center text-center text-muted-foreground">
+            <AppCard className="flex min-h-[24rem] items-center justify-center text-center text-muted-foreground shadow-md">
               Select a conversation to view and reply
             </AppCard>
           ) : (
@@ -114,6 +122,7 @@ export function PublicChatsPage() {
               sending={sending}
               title={selected.title || 'Public chat'}
               maxHeightClass="max-h-[calc(32rem-8rem)]"
+              className="shadow-md"
             />
           )}
         </div>

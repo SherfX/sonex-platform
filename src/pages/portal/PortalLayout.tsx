@@ -17,8 +17,8 @@ export function PortalLayout() {
     )
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-muted/50 via-background to-background">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--color-primary)_0%,_transparent_45%),linear-gradient(180deg,oklch(0.97_0.01_255)_0%,var(--background)_35%)]">
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 shadow-sm backdrop-blur-md">
         <div className="container mx-auto flex h-14 items-center justify-between gap-3 px-4">
           <div className="flex items-center gap-3">
             <Link to="/portal" className="flex items-center gap-2 font-semibold tracking-tight">
@@ -48,7 +48,7 @@ export function PortalLayout() {
           </button>
         </div>
       </header>
-      <main className="container mx-auto max-w-5xl px-4 py-8 md:py-10">
+      <main className="container mx-auto max-w-5xl px-4 py-8 md:py-12">
         <Outlet />
       </main>
     </div>

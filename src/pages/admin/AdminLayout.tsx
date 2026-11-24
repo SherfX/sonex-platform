@@ -22,8 +22,8 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-muted/40 via-background to-background">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--color-accent)_0%,_transparent_40%),linear-gradient(180deg,oklch(0.96_0.012_255)_0%,var(--background)_40%)]">
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/85 shadow-sm backdrop-blur-md">
         <div className="container mx-auto px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link to="/admin" className="flex items-center gap-2 font-semibold tracking-tight">
@@ -69,7 +69,7 @@ export function AdminLayout() {
           </nav>
         </div>
       </header>
-      <main className="container mx-auto max-w-6xl px-4 py-8 md:py-10">
+      <main className="container mx-auto max-w-6xl px-4 py-8 md:py-12">
         <Outlet />
       </main>
     </div>
