@@ -8,7 +8,11 @@ export const ENQUIRY_STATUS = {
 
 export type EnquiryStatus = keyof typeof ENQUIRY_STATUS
 
-export async function uploadEnquiryFile(submissionId: string, file: File, userId: string) {
+export async function uploadEnquiryFile(
+  submissionId: string,
+  file: File,
+  uploaderProfileId: string | null,
+) {
   const path = `enquiries/${submissionId}/${Date.now()}-${file.name.replace(/\s+/g, '-')}`
   const { error: uploadError } = await supabase.storage.from('client-documents').upload(path, file)
   if (uploadError) throw uploadError
@@ -21,7 +25,7 @@ export async function uploadEnquiryFile(submissionId: string, file: File, userId
       filename: file.name,
       mime_type: file.type,
       size_bytes: file.size,
-      uploaded_by: userId,
+      uploaded_by: uploaderProfileId,
       is_public: false,
     })
     .select()

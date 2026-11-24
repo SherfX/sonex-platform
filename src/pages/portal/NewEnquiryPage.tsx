@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { FileUp } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { uploadEnquiryFile } from '../../lib/enquiries'
+import { resolveSubmittedByProfileId } from '../../lib/profile'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { AppCard } from '../../components/ui/AppCard'
 import { buttonAccentClassName, inputClassName } from '../../components/ui/inputStyles'
@@ -31,11 +32,13 @@ export function NewEnquiryPage() {
       return
     }
 
+    const submittedBy = await resolveSubmittedByProfileId()
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('full_name, email, phone')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     const { data: submission, error: insertError } = await supabase
       .from('project_submissions')
@@ -46,7 +49,7 @@ export function NewEnquiryPage() {
         project_title: projectTitle.trim(),
         location: location.trim(),
         message: message.trim(),
-        submitted_by: user.id,
+        submitted_by: submittedBy,
         status: 'new',
       })
       .select('id')
@@ -60,7 +63,7 @@ export function NewEnquiryPage() {
 
     try {
       for (const file of files) {
-        await uploadEnquiryFile(submission.id, file, user.id)
+        await uploadEnquiryFile(submission.id, file, submittedBy)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Some files failed to upload.')

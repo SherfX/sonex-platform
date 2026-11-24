@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { MessageCircle, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -7,8 +7,10 @@ type ChatMessage = {
   body: string
   sender_id?: string | null
   created_at?: string
-  is_bot?: boolean
 }
+
+const LS_CONVERSATION_ID = 'sonex_public_chat_conversation_id'
+const LS_VISITOR_NAME = 'sonex_public_chat_visitor_name'
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false)
@@ -17,28 +19,24 @@ export function ChatWidget() {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [visitorName, setVisitorName] = useState('')
   const [started, setStarted] = useState(false)
+  const [hydrating, setHydrating] = useState(true)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages([
-        {
-          id: 'welcome',
-          body: 'Hello! Welcome to Sonex Contractors. How can we help you today?',
-          is_bot: true,
-          created_at: new Date().toISOString(),
-        },
-      ])
-    }
-  }, [open, messages.length])
+  const persistSession = useCallback((convId: string, name: string) => {
+    localStorage.setItem(LS_CONVERSATION_ID, convId)
+    localStorage.setItem(LS_VISITOR_NAME, name)
+  }, [])
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(LS_CONVERSATION_ID)
+    setConversationId(null)
+    setStarted(false)
+    setMessages([])
+  }, [])
 
-  async function loadMessages(convId: string) {
+  const loadMessages = useCallback(async (convId: string) => {
     const { data, error: fetchError } = await supabase
       .from('messages')
       .select('id, body, sender_id, created_at')
@@ -47,10 +45,82 @@ export function ChatWidget() {
 
     if (fetchError) {
       setError('Could not load messages.')
-      return
+      return false
     }
     setMessages(data || [])
-  }
+    return true
+  }, [])
+
+  const resumeConversation = useCallback(
+    async (convId: string) => {
+      const { data: conv, error: convError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('id', convId)
+        .is('project_id', null)
+        .maybeSingle()
+
+      if (convError || !conv) {
+        localStorage.removeItem(LS_CONVERSATION_ID)
+        setConversationId(null)
+        setStarted(false)
+        setMessages([])
+        return
+      }
+
+      setConversationId(convId)
+      setStarted(true)
+      const ok = await loadMessages(convId)
+      if (!ok) clearSession()
+    },
+    [clearSession, loadMessages],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const storedName = localStorage.getItem(LS_VISITOR_NAME)
+      const storedId = localStorage.getItem(LS_CONVERSATION_ID)
+      if (storedName) setVisitorName(storedName)
+      if (storedId && !cancelled) await resumeConversation(storedId)
+      if (!cancelled) setHydrating(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [resumeConversation])
+
+  useEffect(() => {
+    if (!conversationId) return
+
+    const channel = supabase
+      .channel(`public-chat-messages:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const row = payload.new as ChatMessage
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === row.id)) return prev
+            return [...prev, row]
+          })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [conversationId])
+
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, open])
 
   async function startChat(e: React.FormEvent) {
     e.preventDefault()
@@ -60,11 +130,18 @@ export function ChatWidget() {
       return
     }
 
+    const existingId = localStorage.getItem(LS_CONVERSATION_ID)
+    if (existingId) {
+      await resumeConversation(existingId)
+      return
+    }
+
     setSending(true)
+    const name = visitorName.trim()
     const { data: conv, error: convError } = await supabase
       .from('conversations')
       .insert({
-        title: `Public chat - ${visitorName.trim()}`,
+        title: `Public chat - ${name}`,
       })
       .select('id')
       .single()
@@ -76,13 +153,14 @@ export function ChatWidget() {
       return
     }
 
+    persistSession(conv.id, name)
     setConversationId(conv.id)
     setStarted(true)
 
     await supabase.from('messages').insert({
       conversation_id: conv.id,
       sender_id: null,
-      body: `Thanks ${visitorName.trim()}! An admin will reply shortly. You can also reach us on WhatsApp.`,
+      body: `Thanks ${name}! An admin will reply shortly. You can also reach us on WhatsApp.`,
     })
 
     await loadMessages(conv.id)
@@ -95,10 +173,11 @@ export function ChatWidget() {
 
     setSending(true)
     setError('')
+    const body = input.trim()
     const { error: insertError } = await supabase.from('messages').insert({
       conversation_id: conversationId,
       sender_id: null,
-      body: input.trim(),
+      body,
     })
 
     if (insertError) {
@@ -108,9 +187,10 @@ export function ChatWidget() {
     }
 
     setInput('')
-    await loadMessages(conversationId)
     setSending(false)
   }
+
+  const showComposer = started && !hydrating
 
   return (
     <>
@@ -128,28 +208,36 @@ export function ChatWidget() {
           <div className="border-b px-4 py-3 font-semibold">Chat with Sonex</div>
 
           <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
-            {messages.map((m) => {
-              const isVisitor = !m.sender_id && !m.is_bot
-              const isStaff = Boolean(m.sender_id)
-              return (
-                <div
-                  key={m.id}
-                  className={`max-w-[85%] rounded-lg px-3 py-2 ${
-                    isVisitor
-                      ? 'ml-auto bg-primary text-primary-foreground'
-                      : isStaff
-                        ? 'bg-accent text-accent-foreground'
-                        : 'bg-muted text-foreground'
-                  }`}
-                >
-                  {m.body}
-                </div>
-              )
-            })}
+            {hydrating ? (
+              <p className="text-muted-foreground">Loading your conversation…</p>
+            ) : (
+              <>
+                {!showComposer && messages.length === 0 && (
+                  <p className="rounded-lg bg-muted px-3 py-2 text-foreground">
+                    Hello! Welcome to Sonex Contractors. How can we help you today?
+                  </p>
+                )}
+                {messages.map((m) => {
+                  const isVisitor = !m.sender_id
+                  return (
+                    <div
+                      key={m.id}
+                      className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                        isVisitor
+                          ? 'ml-auto bg-primary text-primary-foreground'
+                          : 'bg-accent text-accent-foreground'
+                      }`}
+                    >
+                      {m.body}
+                    </div>
+                  )
+                })}
+              </>
+            )}
             <div ref={bottomRef} />
           </div>
 
-          {!started ? (
+          {!showComposer ? (
             <form onSubmit={startChat} className="space-y-2 border-t p-3">
               <input
                 required
@@ -161,10 +249,10 @@ export function ChatWidget() {
               {error && <p className="text-xs text-destructive">{error}</p>}
               <button
                 type="submit"
-                disabled={sending}
+                disabled={sending || hydrating}
                 className="w-full rounded-md bg-primary py-2 text-sm text-primary-foreground disabled:opacity-50"
               >
-                {sending ? 'Starting…' : 'Start chat'}
+                {sending ? 'Starting…' : hydrating ? 'Loading…' : 'Start chat'}
               </button>
             </form>
           ) : (
