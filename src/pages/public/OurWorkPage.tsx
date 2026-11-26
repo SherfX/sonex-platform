@@ -13,7 +13,7 @@ export function OurWorkPage() {
 
   return (
     <div>
-      <SectionBackdrop imageUrl={urls.hero_background} variant="hero" className="py-20 md:py-28">
+      <SectionBackdrop imageUrl={urls.hero_background} variant="hero" className="pt-28 pb-20 md:pt-32 md:pb-28">
         <div className="container mx-auto px-4 text-center text-primary-foreground">
           <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-primary-foreground/75">
             Portfolio

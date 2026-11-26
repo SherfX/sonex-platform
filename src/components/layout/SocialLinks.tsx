@@ -53,16 +53,18 @@ function SocialIcon({ platform, className }: { platform: string; className?: str
 
 type SocialLinksProps = {
   links: SocialLink[]
-  variant?: 'header' | 'footer'
+  variant?: 'header' | 'footer' | 'overlay'
   className?: string
 }
 
 export function SocialLinks({ links, variant = 'footer', className }: SocialLinksProps) {
-  const iconSize = variant === 'header' ? 'h-4 w-4' : 'h-5 w-5'
+  const iconSize = variant === 'footer' ? 'h-5 w-5' : 'h-4 w-4'
   const buttonClass =
-    variant === 'header'
-      ? 'flex h-9 w-9 items-center justify-center rounded-full border border-border/80 text-muted-foreground transition-colors hover:border-accent hover:text-accent'
-      : 'flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-accent hover:bg-accent hover:text-accent-foreground'
+    variant === 'overlay'
+      ? 'flex h-9 w-9 items-center justify-center rounded-full border border-white/35 bg-white/10 text-white transition-colors hover:border-white hover:bg-white/20'
+      : variant === 'header'
+        ? 'flex h-9 w-9 items-center justify-center rounded-full border border-border/80 text-muted-foreground transition-colors hover:border-accent hover:text-accent'
+        : 'flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-accent hover:bg-accent hover:text-accent-foreground'
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>

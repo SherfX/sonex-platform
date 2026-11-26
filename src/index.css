@@ -149,6 +149,6 @@
   }
 
   .page-hero {
-    @apply bg-gradient-to-b from-primary/[0.06] via-background to-background py-16 md:py-24;
+    @apply bg-gradient-to-b from-primary/[0.06] via-background to-background pt-28 pb-16 md:pt-32 md:pb-24;
   }
 }

@@ -39,11 +39,16 @@ export function HomePage() {
 
   return (
     <div>
-      <SectionBackdrop imageUrl={urls.hero_background} variant="hero" className="py-24 md:py-32 lg:py-36">
-        <div className="container mx-auto px-4 text-center text-primary-foreground">
-          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-primary-foreground/72">
+      <SectionBackdrop
+        imageUrl={urls.hero_background}
+        variant="hero"
+        className="min-h-[min(92vh,52rem)] pt-28 pb-24 md:pt-36 md:pb-32 lg:pb-36"
+      >
+        <div className="container mx-auto flex min-h-[inherit] flex-col items-center justify-center px-4 text-center text-primary-foreground">
+          <p className="text-[11px] font-bold uppercase tracking-[0.32em] text-primary-foreground/80">
             Sonex Contractors
           </p>
+          <span className="mx-auto mt-3 block h-0.5 w-12 rounded-full bg-accent" aria-hidden />
           <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-bold leading-[1.08] tracking-tight md:text-6xl lg:text-[4rem]">
             Crafting durable solutions
             <br />

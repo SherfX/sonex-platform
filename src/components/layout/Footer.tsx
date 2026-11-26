@@ -11,10 +11,12 @@ export function Footer() {
       <div className="container mx-auto px-4 py-16 md:py-20">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-12 lg:gap-10">
           <div className="lg:col-span-5">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-accent text-sm font-bold text-accent-foreground">
-                S
-              </div>
+            <div className="flex items-center gap-3">
+              <img
+                src="/sonex-logo.jpg"
+                alt="Sonex Contractors"
+                className="h-11 w-11 rounded-full object-cover ring-2 ring-primary-foreground/20"
+              />
               <span className="text-lg font-semibold tracking-tight">Sonex Contractors</span>
             </div>
             <p className="mt-5 max-w-md text-sm leading-relaxed text-primary-foreground/80">

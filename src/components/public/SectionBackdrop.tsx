@@ -14,6 +14,8 @@ const GRADIENTS = {
   light: 'bg-muted/30',
 }
 
+const HERO_FALLBACK = '/hero-reference-fallback.jpg'
+
 export function SectionBackdrop({
   children,
   imageUrl,
@@ -21,20 +23,23 @@ export function SectionBackdrop({
   className,
 }: SectionBackdropProps) {
   const isDark = variant === 'hero' || variant === 'cta'
+  const resolvedImage =
+    imageUrl || (variant === 'hero' || variant === 'cta' ? HERO_FALLBACK : null)
 
   return (
     <section
       className={cn(
         'relative overflow-hidden border-b border-border/40',
-        !imageUrl && GRADIENTS[variant],
-        isDark && !imageUrl && 'text-primary-foreground',
+        !resolvedImage && GRADIENTS[variant],
+        isDark && resolvedImage && 'text-primary-foreground',
+        isDark && !resolvedImage && 'text-primary-foreground',
         className,
       )}
     >
-      {imageUrl && (
+      {resolvedImage && (
         <>
           <img
-            src={imageUrl}
+            src={resolvedImage}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
             loading={variant === 'hero' ? 'eager' : 'lazy'}
@@ -55,7 +60,7 @@ export function SectionBackdrop({
           )}
         </>
       )}
-      {!imageUrl && variant === 'hero' && (
+      {!resolvedImage && variant === 'hero' && (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,oklch(0.62_0.16_42_/_0.25),transparent_42%)]" />
       )}
       <div className="relative">{children}</div>

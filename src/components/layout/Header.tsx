@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useSocialLinks } from '../../hooks/useSocialLinks'
 import { SocialLinks } from './SocialLinks'
+import { BrandLogo } from './BrandLogo'
 import { buttonCtaClassName } from '../ui/inputStyles'
 import { cn } from '../../lib/utils'
 
@@ -15,16 +16,29 @@ const navLinks = [
   { to: '/contact', label: 'Contact' },
 ]
 
+const TRANSPARENT_HEADER_PATHS = new Set(['/', '/work', '/about', '/services', '/contact'])
+
 export function Header() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [role, setRole] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const { links: socialLinks } = useSocialLinks()
   const location = useLocation()
+
+  const canOverlay = TRANSPARENT_HEADER_PATHS.has(location.pathname)
+  const overlayMode = canOverlay && !scrolled && !mobileOpen
 
   useEffect(() => {
     setMobileOpen(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 48)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -50,38 +64,44 @@ export function Header() {
 
   const isStaff = role === 'admin' || role === 'super_admin' || role === 'staff'
 
-  const navClass = ({ isActive }: { isActive: boolean }) =>
-    cn(
-      'relative text-[13px] font-semibold uppercase tracking-[0.12em] transition-colors',
-      isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
-    )
-
   return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] backdrop-blur-xl">
-      <div className="container mx-auto flex h-[4.5rem] items-center justify-between gap-4 px-4 md:h-20">
-        <Link to="/" className="group flex shrink-0 items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-md transition group-hover:shadow-lg">
-            S
-          </div>
-          <div className="leading-tight">
-            <div className="text-[15px] font-semibold tracking-tight text-foreground sm:text-base">
-              Sonex Contractors
-            </div>
-            <div className="hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground sm:block">
-              Built to endure
-            </div>
-          </div>
-        </Link>
+    <header
+      className={cn(
+        'fixed top-0 z-50 w-full transition-all duration-300',
+        overlayMode
+          ? 'border-b border-transparent bg-transparent'
+          : 'border-b border-border/40 bg-background/90 shadow-sm backdrop-blur-xl',
+      )}
+    >
+      <div className="container mx-auto flex h-[4.5rem] items-center justify-between gap-4 px-4 md:h-[4.75rem]">
+        <BrandLogo onDark={overlayMode} />
 
-        <nav className="hidden items-center gap-10 lg:flex">
+        <nav className="hidden items-center gap-8 xl:gap-10 lg:flex">
           {navLinks.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={cn(navClass, 'relative inline-block pb-0.5')}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                cn(
+                  'relative inline-block pb-0.5 text-[12px] font-semibold uppercase tracking-[0.14em] transition-colors',
+                  overlayMode
+                    ? isActive
+                      ? 'text-sky-300'
+                      : 'text-white/85 hover:text-white'
+                    : isActive
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                )
+              }
+            >
               {({ isActive }) => (
                 <>
                   {item.label}
                   <span
                     className={cn(
-                      'absolute bottom-0 left-0 h-0.5 w-full origin-left rounded-full bg-accent transition-transform',
+                      'absolute bottom-0 left-0 h-0.5 w-full origin-left rounded-full transition-transform',
+                      overlayMode ? 'bg-sky-300' : 'bg-accent',
                       isActive ? 'scale-x-100' : 'scale-x-0',
                     )}
                   />
@@ -91,21 +111,43 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-4 md:flex">
-          <SocialLinks links={socialLinks} variant="header" className="mr-1 hidden xl:flex" />
+        <div className="hidden items-center gap-3 md:flex lg:gap-4">
+          <SocialLinks
+            links={socialLinks}
+            variant={overlayMode ? 'overlay' : 'header'}
+            className="mr-0 hidden xl:flex"
+          />
           {user ? (
             <>
-              <Link to="/portal" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+              <Link
+                to="/portal"
+                className={cn(
+                  'text-xs font-semibold uppercase tracking-wide',
+                  overlayMode ? 'text-white/90 hover:text-white' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
                 Portal
               </Link>
               {isStaff && (
-                <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+                <Link
+                  to="/admin"
+                  className={cn(
+                    'text-xs font-semibold uppercase tracking-wide',
+                    overlayMode ? 'text-white/90 hover:text-white' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
                   Admin
                 </Link>
               )}
             </>
           ) : (
-            <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+            <Link
+              to="/login"
+              className={cn(
+                'text-xs font-semibold uppercase tracking-wide',
+                overlayMode ? 'text-white/90 hover:text-white' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
               Login
             </Link>
           )}
@@ -116,7 +158,10 @@ export function Header() {
 
         <button
           type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-border md:hidden"
+          className={cn(
+            'flex h-10 w-10 items-center justify-center rounded-lg border md:hidden',
+            overlayMode ? 'border-white/30 text-white' : 'border-border',
+          )}
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           onClick={() => setMobileOpen((v) => !v)}
         >
@@ -128,7 +173,14 @@ export function Header() {
         <div className="border-t bg-background px-4 py-4 md:hidden">
           <nav className="flex flex-col gap-3">
             {navLinks.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn('text-sm font-semibold uppercase tracking-wide', isActive ? 'text-primary' : 'text-muted-foreground')
+                }
+              >
                 {item.label}
               </NavLink>
             ))}
