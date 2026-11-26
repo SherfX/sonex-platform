@@ -1,9 +1,10 @@
 import { Link } from 'react-router'
 import { useSiteBackgrounds } from '../../hooks/useSiteBackgrounds'
-import { useShowcaseProjects } from '../../hooks/useShowcaseProjects'
+import { useShowcasePosts } from '../../hooks/useShowcasePosts'
 import { SectionBackdrop } from '../../components/public/SectionBackdrop'
-import { ProjectShowcaseCard } from '../../components/public/ProjectShowcaseCard'
+import { ShowcasePostCard } from '../../components/public/ShowcasePostCard'
 import { ListSkeleton } from '../../components/ui/Skeleton'
+import { buttonCtaClassName } from '../../components/ui/inputStyles'
 
 const services = [
   { num: '01', title: 'Residential Construction', desc: 'Homes, apartments and housing developments delivered to specification, on schedule.' },
@@ -34,34 +35,31 @@ const whyUs = [
 
 export function HomePage() {
   const { urls } = useSiteBackgrounds()
-  const { projects: featuredProjects, loading: showcaseLoading } = useShowcaseProjects(3)
+  const { posts: featuredPosts, loading: showcaseLoading } = useShowcasePosts(3)
 
   return (
     <div>
-      <SectionBackdrop imageUrl={urls.hero_background} variant="hero" className="py-20 md:py-28">
+      <SectionBackdrop imageUrl={urls.hero_background} variant="hero" className="py-24 md:py-32 lg:py-36">
         <div className="container mx-auto px-4 text-center text-primary-foreground">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-foreground/70">
+          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-primary-foreground/72">
             Sonex Contractors
           </p>
-          <h1 className="mx-auto mt-5 max-w-4xl text-4xl font-bold tracking-tight md:text-6xl">
+          <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-bold leading-[1.08] tracking-tight md:text-6xl lg:text-[4rem]">
             Crafting durable solutions
             <br />
-            for modern living
+            <span className="text-primary-foreground/95">for modern living</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-primary-foreground/85">
-            With a strong foundation of expertise and innovation, we shape modern living — from
-            planning and design through to project execution.
+          <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-primary-foreground/88 md:text-xl md:leading-relaxed">
+            With a strong foundation of expertise and innovation, we shape modern living — from planning and design
+            through to project execution.
           </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
-            <Link
-              to="/contact"
-              className="min-w-[10rem] rounded-md bg-accent px-8 py-3 text-sm font-semibold text-accent-foreground shadow-md transition hover:bg-accent/90"
-            >
+          <div className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link to="/contact" className={buttonCtaClassName}>
               Start a project
             </Link>
             <Link
               to="/work"
-              className="min-w-[10rem] rounded-md border border-primary-foreground/25 bg-primary-foreground/10 px-8 py-3 text-sm font-semibold backdrop-blur transition hover:bg-primary-foreground/15"
+              className="inline-flex min-w-[10rem] items-center justify-center rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-8 py-3 text-sm font-semibold tracking-wide text-primary-foreground backdrop-blur-md transition hover:border-primary-foreground/45 hover:bg-primary-foreground/15"
             >
               Our work
             </Link>
@@ -69,8 +67,8 @@ export function HomePage() {
         </div>
       </SectionBackdrop>
 
-      <section className="border-b border-border/60 bg-background py-14 md:py-16">
-        <div className="container mx-auto grid grid-cols-2 gap-8 px-4 text-center md:grid-cols-4">
+      <section className="border-b border-border/40 bg-background py-16 md:py-20">
+        <div className="container mx-auto grid grid-cols-2 gap-10 px-4 text-center md:grid-cols-4">
           {[
             { value: '40+', label: 'Projects delivered' },
             { value: '8', label: 'Service lines' },
@@ -78,34 +76,36 @@ export function HomePage() {
             { value: '2025', label: 'Founded' },
           ].map((s) => (
             <div key={s.label}>
-              <div className="text-3xl font-bold text-primary md:text-4xl">{s.value}</div>
-              <div className="mt-1 text-sm text-muted-foreground">{s.label}</div>
+              <div className="text-3xl font-bold tracking-tight text-primary md:text-4xl">{s.value}</div>
+              <div className="mt-2 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {s.label}
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="py-20 md:py-24">
+      <section className="py-20 md:py-28">
         <div className="container mx-auto px-4">
-          <div className="mb-12 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="mb-14 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="section-eyebrow">Featured work</p>
-              <h2 className="mt-2 text-3xl font-bold md:text-4xl">Recent projects</h2>
+              <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">From the showcase</h2>
             </div>
-            <Link to="/work" className="text-sm font-medium text-primary hover:underline">
+            <Link to="/work" className="text-sm font-semibold text-primary hover:underline">
               View all work →
             </Link>
           </div>
           {showcaseLoading ? (
             <ListSkeleton rows={3} />
-          ) : featuredProjects.length === 0 ? (
+          ) : featuredPosts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Showcase projects will appear when marked public or completed in admin.
+              Showcase posts appear when published from Admin → Showcase.
             </p>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {featuredProjects.map((p) => (
-                <ProjectShowcaseCard key={p.id} project={p} />
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {featuredPosts.map((post) => (
+                <ShowcasePostCard key={post.id} post={post} />
               ))}
             </div>
           )}
@@ -115,17 +115,17 @@ export function HomePage() {
       <SectionBackdrop
         imageUrl={urls.services_background}
         variant="light"
-        className="relative border-y border-border/60 py-20 md:py-24"
+        className="relative border-y border-border/40 py-20 md:py-28"
       >
         <div className="container relative mx-auto px-4">
-          <div className="mb-12 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="mb-14 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="section-eyebrow">Our services</p>
-              <h2 className="mt-2 text-3xl font-bold md:text-4xl">
+              <h2 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">
                 Integrated construction services, end to end
               </h2>
             </div>
-            <Link to="/services" className="text-sm font-medium text-primary hover:underline">
+            <Link to="/services" className="text-sm font-semibold text-primary hover:underline">
               All services →
             </Link>
           </div>
@@ -133,10 +133,10 @@ export function HomePage() {
             {services.map((s) => (
               <div
                 key={s.num}
-                className="group rounded-xl border border-border/60 bg-card/95 p-6 shadow-sm backdrop-blur-sm transition hover:border-accent/60 hover:shadow-md"
+                className="group rounded-2xl border border-border/50 bg-card/95 p-6 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-md"
               >
-                <div className="text-xs font-semibold text-accent">{s.num}</div>
-                <h3 className="mt-3 text-lg font-semibold">{s.title}</h3>
+                <div className="text-xs font-bold text-accent">{s.num}</div>
+                <h3 className="mt-4 text-lg font-semibold tracking-tight">{s.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
               </div>
             ))}
@@ -144,11 +144,11 @@ export function HomePage() {
         </div>
       </SectionBackdrop>
 
-      <section className="border-y border-border/60 bg-muted/40 py-20 md:py-24">
+      <section className="border-y border-border/40 bg-muted/25 py-20 md:py-28">
         <div className="container mx-auto px-4">
           <p className="section-eyebrow">Core values</p>
-          <h2 className="mt-2 text-3xl font-bold">What guides every project</h2>
-          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
+          <h2 className="mt-3 text-3xl font-bold tracking-tight">What guides every project</h2>
+          <div className="mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
             {values.map((v) => (
               <div key={v.title}>
                 <h3 className="font-semibold">{v.title}</h3>
@@ -159,11 +159,11 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="py-20 md:py-24">
+      <section className="py-20 md:py-28">
         <div className="container mx-auto px-4">
           <p className="section-eyebrow">Why Sonex</p>
-          <h2 className="mt-2 text-3xl font-bold">Why clients trust us</h2>
-          <div className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
+          <h2 className="mt-3 text-3xl font-bold tracking-tight">Why clients trust us</h2>
+          <div className="mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
             {whyUs.map((w) => (
               <div key={w.title}>
                 <h3 className="font-semibold">{w.title}</h3>
@@ -174,16 +174,13 @@ export function HomePage() {
         </div>
       </section>
 
-      <SectionBackdrop imageUrl={urls.cta_background} variant="cta" className="py-20 md:py-24">
+      <SectionBackdrop imageUrl={urls.cta_background} variant="cta" className="py-20 md:py-28">
         <div className="container mx-auto px-4 text-center text-primary-foreground">
           <h2 className="text-3xl font-bold tracking-tight md:text-4xl">Ready to start your project?</h2>
-          <p className="mx-auto mt-4 max-w-xl text-primary-foreground/85">
+          <p className="mx-auto mt-5 max-w-xl text-lg text-primary-foreground/88">
             Tell us about your plans. We&apos;ll review and get back to you with the next steps.
           </p>
-          <Link
-            to="/contact"
-            className="mt-8 inline-block rounded-md bg-accent px-8 py-3 text-sm font-semibold text-accent-foreground shadow-sm hover:bg-accent/90"
-          >
+          <Link to="/contact" className={`${buttonCtaClassName} mt-10`}>
             Start a project
           </Link>
         </div>

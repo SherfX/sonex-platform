@@ -10,7 +10,7 @@ const links = [
   { to: '/admin/chats', label: 'Chats' },
   { to: '/admin/content', label: 'Content' },
   { to: '/admin/socials', label: 'Socials' },
-  { to: '/admin/showcase', label: 'Showcase' },
+  { to: '/admin/showcase', label: 'Showcase posts' },
 ]
 
 export function AdminLayout() {

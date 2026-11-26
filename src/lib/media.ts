@@ -145,3 +145,51 @@ export async function uploadAndAssignBackground(
   await assignBackgroundImage(slotKey, asset.id)
   return asset
 }
+
+async function clearBackgroundReferences(mediaAssetId: string) {
+  for (const slot of BACKGROUND_SLOTS) {
+    const { data: row } = await supabase
+      .from('site_content')
+      .select('body')
+      .eq('content_key', slot.key)
+      .maybeSingle()
+    const id =
+      row?.body && typeof row.body === 'object' && !Array.isArray(row.body)
+        ? (row.body as { media_asset_id?: string | null }).media_asset_id
+        : null
+    if (id === mediaAssetId) await assignBackgroundImage(slot.key, null)
+  }
+}
+
+/** Deletes public-media asset from storage and media_assets; confirms via caller. */
+export async function deletePublicMediaAsset(assetId: string): Promise<{ error?: string }> {
+  const asset = await fetchMediaAsset(assetId)
+  if (!asset) return { error: 'Media not found.' }
+  if (asset.bucket !== 'public-media') {
+    return { error: 'Only public site uploads can be removed from the media library.' }
+  }
+
+  const { count: showcaseUse } = await supabase
+    .from('showcase_posts')
+    .select('id', { count: 'exact', head: true })
+    .eq('media_asset_id', assetId)
+
+  if (showcaseUse && showcaseUse > 0) {
+    return { error: 'This image is attached to a showcase post. Remove or replace it on the showcase first.' }
+  }
+
+  await clearBackgroundReferences(assetId)
+
+  await supabase.from('projects').update({ cover_media_id: null }).eq('cover_media_id', assetId)
+
+  const { error: storageError } = await supabase.storage.from(asset.bucket).remove([asset.path])
+  if (storageError) {
+    console.error(storageError)
+    return { error: storageError.message }
+  }
+
+  const { error: rowError } = await supabase.from('media_assets').delete().eq('id', assetId)
+  if (rowError) return { error: rowError.message }
+
+  return {}
+}

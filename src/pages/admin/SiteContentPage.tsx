@@ -1,24 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ImageIcon, X, FileText, Upload } from 'lucide-react'
+import { ImageIcon, X, FileText, Upload, Images } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { AppCard } from '../../components/ui/AppCard'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ListSkeleton } from '../../components/ui/Skeleton'
+import { MediaLibraryTile } from '../../components/admin/MediaLibraryTile'
 import { buttonPrimaryClassName, inputClassName } from '../../components/ui/inputStyles'
 import {
   assignBackgroundImage,
   BACKGROUND_SLOTS,
+  deletePublicMediaAsset,
   fetchPublicMediaLibrary,
   getStoragePublicUrl,
   uploadAndAssignBackground,
+  uploadPublicSiteImage,
   type BackgroundSlotKey,
   type MediaAsset,
 } from '../../lib/media'
 import { cn } from '../../lib/utils'
 
-type Tab = 'copy' | 'backgrounds'
+type Tab = 'copy' | 'backgrounds' | 'media'
 
 const CONTENT_KEYS = new Set(['hero_background', 'cta_background', 'services_background'])
 
@@ -34,6 +37,9 @@ export function SiteContentPage() {
   const [library, setLibrary] = useState<MediaAsset[]>([])
   const [uploadingSlot, setUploadingSlot] = useState<BackgroundSlotKey | null>(null)
   const [slotSaving, setSlotSaving] = useState<BackgroundSlotKey | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [mediaError, setMediaError] = useState('')
+  const [uploadingLibrary, setUploadingLibrary] = useState(false)
   const [assigned, setAssigned] = useState<Partial<Record<BackgroundSlotKey, string | null>>>({})
 
   useEffect(() => {
@@ -99,6 +105,32 @@ export function SiteContentPage() {
     load()
   }
 
+  async function handleDeleteAsset(asset: MediaAsset) {
+    const ok = window.confirm(
+      `Delete "${asset.filename}" from storage and the media library? Background slots using it will be cleared.`,
+    )
+    if (!ok) return
+    setMediaError('')
+    setDeletingId(asset.id)
+    const result = await deletePublicMediaAsset(asset.id)
+    setDeletingId(null)
+    if (result.error) {
+      setMediaError(result.error)
+      return
+    }
+    await queryClient.invalidateQueries({ queryKey: ['site-backgrounds'] })
+    load()
+  }
+
+  async function uploadToLibrary(file: File) {
+    setUploadingLibrary(true)
+    setMediaError('')
+    const asset = await uploadPublicSiteImage(file, file.name)
+    setUploadingLibrary(false)
+    if (!asset) setMediaError('Upload failed.')
+    else load()
+  }
+
   const previewUrl = (slot: BackgroundSlotKey) => {
     const id = assigned[slot]
     if (!id) return null
@@ -111,33 +143,35 @@ export function SiteContentPage() {
       <PageHeader
         eyebrow="Public website"
         title="Site content & imagery"
-        description="Each homepage section (hero, services, CTA) has its own background image assignment."
+        description="Copy, per-section backgrounds, and the shared public media library."
       />
 
-      <div className="mb-6 flex gap-2 rounded-lg border border-border/60 bg-muted/30 p-1">
-        <button
-          type="button"
-          onClick={() => setTab('copy')}
-          className={cn(
-            'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition',
-            tab === 'copy' ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <FileText className="h-4 w-4" />
-          Copy blocks
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('backgrounds')}
-          className={cn(
-            'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition',
-            tab === 'backgrounds' ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          <ImageIcon className="h-4 w-4" />
-          Background images
-        </button>
+      <div className="mb-6 flex flex-wrap gap-2 rounded-xl border border-border/60 bg-muted/30 p-1">
+        {[
+          { id: 'copy' as const, label: 'Copy blocks', icon: FileText },
+          { id: 'backgrounds' as const, label: 'Backgrounds', icon: ImageIcon },
+          { id: 'media' as const, label: 'Media library', icon: Images },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              'flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition min-w-[8rem]',
+              tab === id ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
       </div>
+
+      {mediaError && (
+        <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {mediaError}
+        </p>
+      )}
 
       {tab === 'copy' && (
         <>
@@ -214,37 +248,71 @@ export function SiteContentPage() {
                 )}
 
                 <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Or pick from library (applies only to {slot.label})
+                  Pick from library (applies only to {slot.label})
                 </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {library.map((asset) => {
-                    const url = getStoragePublicUrl(asset.bucket, asset.path)
-                    const selected = assigned[slot.key] === asset.id
-                    return (
-                      <button
-                        key={`${slot.key}-${asset.id}`}
-                        type="button"
-                        disabled={slotSaving === slot.key}
-                        onClick={() => assignSlot(slot.key, asset.id)}
-                        className={cn(
-                          'overflow-hidden rounded-lg border-2 text-left transition',
-                          selected ? 'border-accent ring-2 ring-accent/30' : 'border-transparent hover:border-border',
-                        )}
-                      >
-                        <img
-                          src={url}
-                          alt={asset.alt_text || asset.filename}
-                          className="aspect-video w-full object-cover"
-                        />
-                        <p className="truncate px-2 py-1 text-xs text-muted-foreground">{asset.filename}</p>
-                      </button>
-                    )
-                  })}
+                  {library.map((asset) => (
+                    <MediaLibraryTile
+                      key={`${slot.key}-${asset.id}`}
+                      asset={asset}
+                      selected={assigned[slot.key] === asset.id}
+                      deleting={deletingId === asset.id}
+                      onSelect={() => assignSlot(slot.key, asset.id)}
+                      onDelete={handleDeleteAsset}
+                    />
+                  ))}
                 </div>
               </AppCard>
             )
           })}
         </div>
+      )}
+
+      {tab === 'media' && (
+        <AppCard>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Public media library</h2>
+              <p className="text-sm text-muted-foreground">
+                Images in public-media. Delete removes storage and the database row (with confirmation).
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted">
+              <Upload className="h-4 w-4" />
+              {uploadingLibrary ? 'Uploading…' : 'Upload image'}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                disabled={uploadingLibrary}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) uploadToLibrary(f)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          </div>
+          {loading ? (
+            <div className="mt-6">
+              <ListSkeleton rows={6} />
+            </div>
+          ) : library.length === 0 ? (
+            <EmptyState title="No images" description="Upload site imagery for backgrounds and showcase posts." className="mt-6" />
+          ) : (
+            <div className="mt-6 grid gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {library.map((asset) => (
+                <MediaLibraryTile
+                  key={asset.id}
+                  asset={asset}
+                  deleting={deletingId === asset.id}
+                  onDelete={handleDeleteAsset}
+                  aspect="square"
+                />
+              ))}
+            </div>
+          )}
+        </AppCard>
       )}
 
       {editing && (
@@ -272,11 +340,7 @@ export function SiteContentPage() {
               />
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditing(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm"
-              >
+              <button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-border px-4 py-2 text-sm">
                 Cancel
               </button>
               <button type="button" onClick={saveCopy} disabled={saving} className={buttonPrimaryClassName}>

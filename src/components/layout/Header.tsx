@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useSocialLinks } from '../../hooks/useSocialLinks'
 import { SocialLinks } from './SocialLinks'
+import { buttonCtaClassName } from '../ui/inputStyles'
 import { cn } from '../../lib/utils'
 
 const navLinks = [
@@ -31,11 +32,7 @@ export function Header() {
       if (!mounted) return
       setUser(data.user ? { id: data.user.id } : null)
       if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .single()
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
         if (mounted) setRole(profile?.role ?? null)
       } else {
         setRole(null)
@@ -55,73 +52,71 @@ export function Header() {
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     cn(
-      'text-sm font-medium transition-colors',
+      'relative text-[13px] font-semibold uppercase tracking-[0.12em] transition-colors',
       isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
     )
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4 md:h-[4.25rem]">
-        <Link to="/" className="flex shrink-0 items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 shadow-[0_1px_0_rgba(255,255,255,0.06)_inset] backdrop-blur-xl">
+      <div className="container mx-auto flex h-[4.5rem] items-center justify-between gap-4 px-4 md:h-20">
+        <Link to="/" className="group flex shrink-0 items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-md transition group-hover:shadow-lg">
             S
           </div>
           <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-tight text-foreground sm:text-base">
+            <div className="text-[15px] font-semibold tracking-tight text-foreground sm:text-base">
               Sonex Contractors
             </div>
-            <div className="hidden text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground sm:block">
+            <div className="hidden text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground sm:block">
               Built to endure
             </div>
           </div>
         </Link>
 
-        <nav className="hidden items-center gap-8 lg:flex">
+        <nav className="hidden items-center gap-10 lg:flex">
           {navLinks.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navClass}>
-              {item.label}
+            <NavLink key={item.to} to={item.to} end={item.end} className={cn(navClass, 'relative inline-block pb-0.5')}>
+              {({ isActive }) => (
+                <>
+                  {item.label}
+                  <span
+                    className={cn(
+                      'absolute bottom-0 left-0 h-0.5 w-full origin-left rounded-full bg-accent transition-transform',
+                      isActive ? 'scale-x-100' : 'scale-x-0',
+                    )}
+                  />
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-4 md:flex">
           <SocialLinks links={socialLinks} variant="header" className="mr-1 hidden xl:flex" />
           {user ? (
             <>
-              <Link
-                to="/portal"
-                className="text-sm font-medium text-muted-foreground hover:text-foreground"
-              >
+              <Link to="/portal" className="text-sm font-medium text-muted-foreground hover:text-foreground">
                 Portal
               </Link>
               {isStaff && (
-                <Link
-                  to="/admin"
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground"
-                >
+                <Link to="/admin" className="text-sm font-medium text-muted-foreground hover:text-foreground">
                   Admin
                 </Link>
               )}
             </>
           ) : (
-            <Link
-              to="/login"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
+            <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground">
               Login
             </Link>
           )}
-          <Link
-            to="/contact"
-            className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground shadow-sm transition hover:bg-accent/90"
-          >
+          <Link to="/contact" className={cn(buttonCtaClassName, 'hidden px-6 py-2.5 text-xs sm:inline-flex')}>
             Start a project
           </Link>
         </div>
 
         <button
           type="button"
-          className="flex h-10 w-10 items-center justify-center rounded-md border border-border md:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-border md:hidden"
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           onClick={() => setMobileOpen((v) => !v)}
         >
@@ -154,10 +149,7 @@ export function Header() {
               </Link>
             )}
             <SocialLinks links={socialLinks} variant="footer" className="pt-2" />
-            <Link
-              to="/contact"
-              className="mt-2 rounded-md bg-accent px-4 py-2.5 text-center text-sm font-semibold text-accent-foreground"
-            >
+            <Link to="/contact" className={cn(buttonCtaClassName, 'mt-2 justify-center')}>
               Start a project
             </Link>
           </nav>

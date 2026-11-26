@@ -9,9 +9,9 @@ type SectionBackdropProps = {
 }
 
 const GRADIENTS = {
-  hero: 'bg-gradient-to-b from-primary via-primary to-primary/95',
-  cta: 'bg-gradient-to-br from-primary via-primary/95 to-primary/85',
-  light: 'bg-muted/40',
+  hero: 'bg-gradient-to-b from-primary via-[#0f1c35] to-primary',
+  cta: 'bg-gradient-to-br from-primary via-primary to-[#0c1528]',
+  light: 'bg-muted/30',
 }
 
 export function SectionBackdrop({
@@ -25,7 +25,7 @@ export function SectionBackdrop({
   return (
     <section
       className={cn(
-        'relative overflow-hidden border-b border-border/60',
+        'relative overflow-hidden border-b border-border/40',
         !imageUrl && GRADIENTS[variant],
         isDark && !imageUrl && 'text-primary-foreground',
         className,
@@ -42,19 +42,21 @@ export function SectionBackdrop({
           <div
             className={cn(
               'absolute inset-0',
-              variant === 'hero' && 'bg-gradient-to-b from-primary/90 via-primary/80 to-primary/95',
-              variant === 'cta' && 'bg-gradient-to-r from-primary/92 via-primary/85 to-primary/75',
-              variant === 'light' && 'bg-background/85',
+              variant === 'hero' && 'bg-gradient-to-b from-primary/88 via-primary/78 to-primary/92',
+              variant === 'cta' && 'bg-gradient-to-r from-primary/90 via-primary/82 to-primary/88',
+              variant === 'light' && 'bg-background/88',
             )}
           />
-          {!isDark && variant === 'light' && null}
           {isDark && (
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,oklch(0.62_0.16_42_/_0.18),transparent_45%)]" />
+            <>
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(255,255,255,0.08),transparent_55%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_25%,oklch(0.62_0.16_42_/_0.2),transparent_45%)]" />
+            </>
           )}
         </>
       )}
       {!imageUrl && variant === 'hero' && (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,oklch(0.62_0.16_42_/_0.22),transparent_45%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_20%,oklch(0.62_0.16_42_/_0.25),transparent_42%)]" />
       )}
       <div className="relative">{children}</div>
     </section>

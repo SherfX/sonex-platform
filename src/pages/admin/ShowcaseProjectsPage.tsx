@@ -1,37 +1,35 @@
 import { useEffect, useState } from 'react'
-import { ImagePlus } from 'lucide-react'
+import { ImagePlus, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { AppCard } from '../../components/ui/AppCard'
 import { ListSkeleton } from '../../components/ui/Skeleton'
-import { StatusBadge } from '../../components/ui/StatusBadge'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { inputClassName } from '../../components/ui/inputStyles'
+import { buttonAccentClassName, inputClassName } from '../../components/ui/inputStyles'
 import {
-  fetchPublicMediaLibrary,
   getStoragePublicUrl,
   uploadPublicSiteImage,
   type MediaAsset,
 } from '../../lib/media'
-import { cn } from '../../lib/utils'
 
-type ProjectRow = {
+type ShowcaseRow = {
   id: string
   title: string
   description: string | null
-  location: string | null
-  status: string
-  is_public: boolean
-  cover_media_id: string | null
-  cover_media: MediaAsset | null
+  sort_order: number
+  is_published: boolean
+  media_asset_id: string | null
+  media: MediaAsset | null
 }
 
 export function ShowcaseProjectsPage() {
-  const [projects, setProjects] = useState<ProjectRow[]>([])
-  const [library, setLibrary] = useState<MediaAsset[]>([])
+  const [posts, setPosts] = useState<ShowcaseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
-  const [uploadForId, setUploadForId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draftDescription, setDraftDescription] = useState('')
+  const [draftFile, setDraftFile] = useState<File | null>(null)
 
   useEffect(() => {
     load()
@@ -40,126 +38,209 @@ export function ShowcaseProjectsPage() {
   async function load() {
     setLoading(true)
     const { data } = await supabase
-      .from('projects')
+      .from('showcase_posts')
       .select(
-        `id, title, description, location, status, is_public, cover_media_id,
-         cover_media:cover_media_id (id, bucket, path, filename, mime_type, alt_text, is_public)`,
+        `id, title, description, sort_order, is_published, media_asset_id,
+         media:media_asset_id (id, bucket, path, filename, mime_type, alt_text, is_public)`,
       )
-      .order('updated_at', { ascending: false })
-    const rows = ((data || []) as unknown as ProjectRow[]).map((row) => ({
-      ...row,
-      cover_media: Array.isArray(row.cover_media) ? row.cover_media[0] : row.cover_media,
-    }))
-    setProjects(rows)
-    setLibrary(await fetchPublicMediaLibrary())
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false })
+
+    const rows = ((data || []) as unknown[]).map((row) => {
+      const r = row as ShowcaseRow
+      const media = r.media as MediaAsset | MediaAsset[] | null
+      return { ...r, media: Array.isArray(media) ? media[0] : media }
+    })
+    setPosts(rows)
     setLoading(false)
   }
 
-  async function updateProject(
+  async function savePost(
     id: string,
-    fields: { is_public?: boolean; description?: string; cover_media_id?: string | null },
+    patch: Partial<Pick<ShowcaseRow, 'title' | 'description' | 'is_published' | 'sort_order'>>,
   ) {
     setSavingId(id)
-    await supabase.from('projects').update(fields).eq('id', id)
+    await supabase.from('showcase_posts').update(patch).eq('id', id)
     setSavingId(null)
     load()
   }
 
-  async function uploadCover(projectId: string, file: File) {
-    setUploadForId(projectId)
-    const asset = await uploadPublicSiteImage(file, `Cover — project ${projectId}`)
-    if (asset) {
-      await updateProject(projectId, { cover_media_id: asset.id, is_public: true })
+  async function createPost(e: React.FormEvent) {
+    e.preventDefault()
+    if (!draftTitle.trim()) return
+    setCreating(true)
+
+    let mediaId: string | null = null
+    if (draftFile) {
+      const asset = await uploadPublicSiteImage(draftFile, draftTitle.trim())
+      mediaId = asset?.id ?? null
     }
-    setUploadForId(null)
+
+    await supabase.from('showcase_posts').insert({
+      title: draftTitle.trim(),
+      description: draftDescription.trim() || null,
+      media_asset_id: mediaId,
+      sort_order: posts.length + 1,
+      is_published: true,
+    })
+
+    setDraftTitle('')
+    setDraftDescription('')
+    setDraftFile(null)
+    setCreating(false)
+    load()
+  }
+
+  async function replaceImage(postId: string, file: File) {
+    setSavingId(postId)
+    const post = posts.find((p) => p.id === postId)
+    const asset = await uploadPublicSiteImage(file, post?.title || 'Showcase')
+    if (asset) {
+      await supabase.from('showcase_posts').update({ media_asset_id: asset.id }).eq('id', postId)
+    }
+    setSavingId(null)
+    load()
+  }
+
+  async function deletePost(post: ShowcaseRow) {
+    if (!window.confirm(`Delete showcase post "${post.title}"?`)) return
+    setSavingId(post.id)
+    await supabase.from('showcase_posts').delete().eq('id', post.id)
+    setSavingId(null)
+    load()
   }
 
   return (
     <div>
       <PageHeader
         eyebrow="Public website"
-        title="Showcase projects"
-        description="Choose which projects appear on /work and set cover images from media_assets."
+        title="Showcase gallery"
+        description="Independent posts for the Our Work page — image, title, and description. Delivery projects stay in Projects."
       />
 
+      <AppCard className="mb-8 border-accent/20 bg-gradient-to-br from-accent/5 to-card">
+        <h2 className="text-base font-semibold">New showcase post</h2>
+        <form onSubmit={createPost} className="mt-4 grid gap-4 lg:grid-cols-2">
+          <input
+            required
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            placeholder="Post title"
+            className={inputClassName}
+          />
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm hover:border-accent/50">
+            <ImagePlus className="h-4 w-4 text-accent" />
+            {draftFile ? draftFile.name : 'Upload cover image'}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => setDraftFile(e.target.files?.[0] || null)}
+            />
+          </label>
+          <textarea
+            value={draftDescription}
+            onChange={(e) => setDraftDescription(e.target.value)}
+            rows={3}
+            placeholder="Description shown on the public card"
+            className={`${inputClassName} lg:col-span-2`}
+          />
+          <button type="submit" disabled={creating} className={buttonAccentClassName}>
+            {creating ? 'Publishing…' : 'Publish post'}
+          </button>
+        </form>
+      </AppCard>
+
       {loading ? (
-        <ListSkeleton rows={5} />
-      ) : projects.length === 0 ? (
-        <EmptyState title="No projects" description="Create projects in Supabase to manage showcase visibility." />
+        <ListSkeleton rows={4} />
+      ) : posts.length === 0 ? (
+        <EmptyState
+          title="No showcase posts"
+          description="Create your first post above. Visitors will see it on /work and the homepage gallery."
+        />
       ) : (
-        <div className="space-y-4">
-          {projects.map((p) => {
-            const cover = p.cover_media
-            const coverUrl =
-              cover?.is_public && cover.bucket && cover.path
-                ? getStoragePublicUrl(cover.bucket, cover.path)
+        <div className="space-y-5">
+          {posts.map((post) => {
+            const url =
+              post.media?.is_public && post.media.path
+                ? getStoragePublicUrl(post.media.bucket, post.media.path)
                 : null
             return (
-              <AppCard key={p.id}>
-                <div className="flex flex-col gap-5 lg:flex-row">
-                  <div className="relative h-36 w-full shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/15 to-muted lg:w-48">
-                    {coverUrl ? (
-                      <img src={coverUrl} alt={cover?.alt_text || p.title} className="h-full w-full object-cover" />
+              <AppCard key={post.id} padding={false} className="overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  <div className="relative h-48 w-full shrink-0 bg-muted md:h-auto md:w-56">
+                    {url ? (
+                      <img src={url} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                        No cover image
+                      <div className="flex h-full min-h-[12rem] items-center justify-center text-xs text-muted-foreground">
+                        No image
                       </div>
                     )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg font-semibold">{p.title}</h2>
-                      <StatusBadge status={p.status} />
-                      {p.is_public && (
-                        <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">
-                          On showcase
-                        </span>
-                      )}
-                    </div>
-                    {p.location && <p className="mt-1 text-sm text-muted-foreground">{p.location}</p>}
-                    <textarea
-                      defaultValue={p.description || ''}
-                      rows={2}
-                      placeholder="Short public description"
-                      className={`${inputClassName} mt-3`}
-                      onBlur={(e) => {
-                        if (e.target.value !== (p.description || '')) {
-                          updateProject(p.id, { description: e.target.value })
-                        }
-                      }}
-                    />
-                    <label className="mt-3 flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={p.is_public}
-                        disabled={savingId === p.id}
-                        onChange={(e) => updateProject(p.id, { is_public: e.target.checked })}
-                        className="h-4 w-4 rounded border-border"
-                      />
-                      Show on public Our Work page
-                    </label>
-                  </div>
-                  <div className="lg:w-56">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cover image</p>
-                    <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs hover:border-accent">
-                      <ImagePlus className="h-4 w-4 text-accent" />
-                      {uploadForId === p.id ? 'Uploading…' : 'Upload new'}
+                    <label className="absolute bottom-3 left-3 cursor-pointer rounded-lg bg-background/90 px-2 py-1 text-xs font-medium shadow">
+                      {savingId === post.id ? 'Uploading…' : 'Change image'}
                       <input
                         type="file"
                         accept="image/*"
                         className="sr-only"
                         onChange={(e) => {
                           const f = e.target.files?.[0]
-                          if (f) uploadCover(p.id, f)
+                          if (f) replaceImage(post.id, f)
                         }}
                       />
                     </label>
-                    <CoverImagePicker
-                      library={library}
-                      selectedId={p.cover_media_id}
-                      saving={savingId === p.id}
-                      onSelect={(assetId) => updateProject(p.id, { cover_media_id: assetId })}
+                  </div>
+                  <div className="flex flex-1 flex-col gap-3 p-5">
+                    <input
+                      key={`title-${post.id}-${post.title}`}
+                      defaultValue={post.title}
+                      disabled={savingId === post.id}
+                      onBlur={(e) => {
+                        if (e.target.value !== post.title) savePost(post.id, { title: e.target.value })
+                      }}
+                      className={`${inputClassName} text-lg font-semibold`}
                     />
+                    <textarea
+                      key={`desc-${post.id}`}
+                      defaultValue={post.description || ''}
+                      rows={3}
+                      disabled={savingId === post.id}
+                      onBlur={(e) => {
+                        const v = e.target.value
+                        if (v !== (post.description || '')) savePost(post.id, { description: v })
+                      }}
+                      className={inputClassName}
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={post.is_published}
+                          disabled={savingId === post.id}
+                          onChange={(e) => savePost(post.id, { is_published: e.target.checked })}
+                        />
+                        Visible on public site
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Order</span>
+                        <input
+                          type="number"
+                          defaultValue={post.sort_order}
+                          className={`${inputClassName} w-16 text-center`}
+                          onBlur={(e) => {
+                            const n = parseInt(e.target.value, 10)
+                            if (!Number.isNaN(n) && n !== post.sort_order) savePost(post.id, { sort_order: n })
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => deletePost(post)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </AppCard>
@@ -167,44 +248,6 @@ export function ShowcaseProjectsPage() {
           })}
         </div>
       )}
-    </div>
-  )
-}
-
-function CoverImagePicker({
-  library,
-  selectedId,
-  saving,
-  onSelect,
-}: {
-  library: MediaAsset[]
-  selectedId: string | null
-  saving: boolean
-  onSelect: (id: string) => void
-}) {
-  if (library.length === 0) {
-    return <p className="mt-2 text-xs text-muted-foreground">Upload images under Content → Backgrounds.</p>
-  }
-  return (
-    <div className="mt-2 grid max-h-40 grid-cols-3 gap-1 overflow-y-auto">
-      {library.map((asset) => (
-        <button
-          key={asset.id}
-          type="button"
-          disabled={saving}
-          onClick={() => onSelect(asset.id)}
-          className={cn(
-            'overflow-hidden rounded border',
-            selectedId === asset.id ? 'border-accent ring-1 ring-accent' : 'border-transparent',
-          )}
-        >
-          <img
-            src={getStoragePublicUrl(asset.bucket, asset.path)}
-            alt=""
-            className="aspect-square object-cover"
-          />
-        </button>
-      ))}
     </div>
   )
 }
